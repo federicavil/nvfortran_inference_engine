@@ -1,0 +1,6 @@
+name = "inference-engine"
+version = "0.11.0"
+license = "see LICENSE.txt"
+author = "Damian Rouson, Tan Nguyen, Jordan Welsman, David Torres, Brad Richardson, Katherine Rasmussen, Federica Villani"
+maintainer = "rouson@lbl.gov"
+
