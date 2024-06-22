@@ -7,7 +7,7 @@ module inference_engine_m_
   use kind_parameters_m, only : rkind
   use tensor_m, only : tensor_t
   use tensor_range_m, only : tensor_range_t
-
+  
   implicit none
 
   private
@@ -16,6 +16,7 @@ module inference_engine_m_
   public :: exchange_t
   public :: infer
   public :: parallel_infer
+  public :: cuda_infer
 
   character(len=*), parameter :: key(*) = [character(len=len("usingSkipConnections")) :: &
     "modelName", "modelAuthor", "compilationDate", "activationFunction", "usingSkipConnections"]
@@ -31,6 +32,7 @@ module inference_engine_m_
   contains
     procedure :: infer
     procedure :: parallel_infer
+    procedure :: cuda_infer
     procedure :: num_inputs
     procedure :: num_outputs
     procedure :: nodes_per_layer

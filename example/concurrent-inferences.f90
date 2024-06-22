@@ -82,7 +82,14 @@ program concurrent_inferences
         call system_clock(t_finish)
         print *,"Concurrent inference time with non-type-bound procedure: ", &
         real(t_finish - t_start, real64)/real(clock_rate, real64)
-  
+
+        print *,"Performing cuda inferences"
+        call system_clock(t_start, clock_rate)
+        outputs = inference_engine%cuda_infer(inputs)  ! implicit allocation of outputs array
+        call system_clock(t_finish)
+        print *,"Cuda inference time: ", &
+        real(t_finish - t_start, real64)/real(clock_rate, real64) 
+
         print *,"Performing multithreading/offloading inferences"
         call system_clock(t_start, clock_rate)
         outputs = inference_engine%parallel_infer(inputs)  ! implicit allocation of outputs array
@@ -90,6 +97,7 @@ program concurrent_inferences
         print *,"Multithreading/Offloading inference time: ", &
         real(t_finish - t_start, real64)/real(clock_rate, real64) 
 
+        
       end block
     end block
   
