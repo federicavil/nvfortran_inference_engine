@@ -16,7 +16,7 @@ submodule(inference_engine_m_) inference_engine_s
     associate(w => self%weights_, b => self%biases_, n => self%nodes_, output_layer => ubound(self%nodes_,1))
 
       allocate(a(maxval(n), input_layer:output_layer))
-      a(1:n(input_layer),input_layer) = (inputs%values_ - self%input_range_%minima_)/(self%input_range_%maxima_- self%input_range_%minima_)
+      a(1:n(input_layer),input_layer) = (inputs%values_ )!- self%input_range_%minima_)/(self%input_range_%maxima_- self%input_range_%minima_)
       
       feed_forward: &
       do l = input_layer+1, output_layer
@@ -24,75 +24,81 @@ submodule(inference_engine_m_) inference_engine_s
           a(1:n(l),l) = 1./(1.+exp(-z))
         end associate
       end do feed_forward
-      outputs = tensor_t(self%output_range_%minima_ + a(1:n(output_layer), output_layer)*(self%output_range_%maxima_ - self%output_range_%minima_ ))
+      !outputs = tensor_t(self%output_range_%minima_ + a(1:n(output_layer), output_layer)*(self%output_range_%maxima_ - self%output_range_%minima_ ))
+      outputs = tensor_t(a(1:n(output_layer), output_layer))
 
     end associate
 
   end procedure
 
 
-  attributes(global) subroutine cuda_function(input_components,output_components,w,b,n,min_in, max_in, min_out, max_out,lon,lev,lat)
+  attributes(global) subroutine cuda_function(input_components,output_components,a,w,b,n,lon,lev,lat)
     real(rkind), device :: w(:,:,:), b(:,:)
     integer, device :: n(:)
-    real, device, dimension(:) :: min_in, max_in, min_out, max_out
+    integer, device :: lon,lev,lat
+    real, device :: min_in(:), max_in(:), min_out(:), max_out(:)
     real, device :: input_components(:,:,:,:), output_components(:,:,:,:)
-    integer, value :: input_layer = 0, output_layer, lon,lev,lat,l, row, col, part_res = 0, n_points
-    ! real, shared ::w_s(:,:,:), b_s(:,:), min_in_s(:), max_in_s(:), min_out_s(:), max_out_s(:)
-    real(rkind), allocatable :: a(:,:)
-    integer tid_global, nBlocks, curr_block,x,y,z
-    
-    !Questa da togliere che non ha senso che viene calcolato per ogni thread
-    output_layer = ubound(n,1)
+    integer, value :: input_layer = 1, output_layer=5, l, row, col, n_points
+    !real, shared :: min_in_s(7), max_in_s(7), min_out_s(5), max_out_s(5)
+    real(rkind), device :: a(:,:,:,:,:)
+    real(rkind) :: part_res
+    integer tid_global, nBlocks, curr_block,x,y,z,tid
+    print *,"ciao"
+    tid = threadIdx%x
     n_points = lon*lev*lat
-    allocate(a(maxval(n), input_layer:output_layer))
     nBlocks = ceiling(real(n_points) / real(blockDim%x))
-    curr_block = blockIdx%x
-
-    do while (curr_block <= nBlocks)
-      tid_global = blockDim%x*curr_block + threadIdx%x
-      z = tid_global / (lon*lev)
-      tid_global = mod(tid_global, lon*lev)
-      y = tid_global / lon
-      x = mod(tid_global,lon)
-
-      a(1:n(input_layer),input_layer) = (input_components(x+1,y+1,z+1,:) - min_in)/(max_in- min_in)
-      feed_forward: &
-      do l = input_layer+1, output_layer
-        !Matrix multiplication
+    curr_block = blockIdx%x -1
+    do while (curr_block < nBlocks)
+      tid_global = blockDim%x*curr_block + tid -1
+      if (tid_global < n_points) then
+        z = tid_global / (lon*lev)
+        tid_global = mod(tid_global, lon*lev)
+        y = tid_global / lon
+        x = mod(tid_global,lon)
+    !     !a(x+1,y+1,z+1,1:n(input_layer),input_layer) = (input_components(x+1,y+1,z+1,:) - min_in(:))/(max_in(:) - min_in(:))
+        if(tid_global == 391) then
+          print *, x+1,y+1,z+1
+        end if
+        a(x+1,y+1,z+1,1:n(input_layer),input_layer) = input_components(x+1,y+1,z+1,:)
+        feed_forward: &
+        do l = input_layer+1, output_layer
+    !       !Matrix multiplication
         do row=1,n(l)
           part_res = 0
           do col=1,n(l-1)
-            part_res = part_res + w(row,col,l)*a(col,l-1)
+            part_res = part_res + w(row,col,l-1)*a(x+1,y+1,z+1,col,l-1)
           end do
-          a(row,l) = 1./(1.+exp(-(part_res + b(row,l))))
+          a(x+1,y+1,z+1,row,l) = 1./(1.+exp(-(part_res + b(row,l-1))))
         end do
-        !a(1:n(l),l) = 1./(1.+exp(-(matmul(w(1:n(l),1:n(l-1),l), a(1:n(l-1),l-1)) + b(1:n(l),l))))
-      end do feed_forward
-      output_components(x+1,y+1,z+1,:) = min_out + a(1:n(output_layer), output_layer)*(max_out - min_out)
-      curr_block = curr_block + 66535
+    !       !a(1:n(l),l) = 1./(1.+exp(-(matmul(w(1:n(l),1:n(l-1),l), a(1:n(l-1),l-1)) + b(1:n(l),l))))
+        end do feed_forward
+        output_components(x+1,y+1,z+1,:) = a(x+1,y+1,z+1,1:n(output_layer), output_layer)
+        
+    !     !output_components(x+1,y+1,z+1,:) = min_out(:) + a(x+1,y+1,z+1,1:n(output_layer), output_layer)*(max_out(:) - min_out(:))
+      end if
+    curr_block = curr_block + 66535
     end do
   end subroutine
 
   module procedure cuda_infer
-    real(rkind), allocatable :: a(:,:) !Faccio l'allocazione diretta sul device
     integer, parameter :: input_layer = 0 !questo mi sa che serve al device
-    integer i,j,k, l, dims(3), lat, lon, lev !Dovrebbe stare solo qui
-    integer :: dim_thread, dim_block
+    integer i,j,k, l, dims(3) !Dovrebbe stare solo qui
+    integer :: dim_thread, dim_block, istat
     !real(rkind), allocatable :: w(:,:,:), b(:,:)
     !integer, allocatable :: n(:)
     real(rkind), device, allocatable :: w_d(:,:,:), b_d(:,:)
     integer, device, allocatable :: n_d(:)
-    integer output_layer !questo serve al device
+    integer, device :: lat,lon,lev
+    integer :: output_layer !questo serve al device
     !real, allocatable, dimension(:) :: min_in, max_in, min_out, max_out
     real, device, allocatable, dimension(:) :: min_in_d, max_in_d, min_out_d, max_out_d
-    real, allocatable :: input_components(:,:,:,:), output_components(:,:,:,:)
-    real, device, allocatable :: input_components_d(:,:,:,:), output_components_d(:,:,:,:)
+    real(rkind), allocatable :: input_components(:,:,:,:), output_components(:,:,:,:)
+    real(rkind), device, allocatable :: input_components_d(:,:,:,:), output_components_d(:,:,:,:), a(:,:,:,:,:)
 
-    dims = shape(inputs)
     w_d = self%weights_ 
-    n_d = self%nodes_
     b_d = self%biases_
-    output_layer = ubound(n_d,1)
+    n_d = self%nodes_
+    output_layer = ubound(self%nodes_,1)
     min_in_d = self%input_range_%minima_
     max_in_d = self%input_range_%maxima_
     min_out_d = self%output_range_%minima_
@@ -105,31 +111,37 @@ submodule(inference_engine_m_) inference_engine_s
     allocate(input_components_d(lon,lev,lat,self%num_inputs()))
     allocate(output_components(lon,lev,lat,self%num_outputs()))
     allocate(output_components_d(lon,lev,lat,self%num_outputs()))
+    allocate(a(lon,lev,lat,maxval(self%nodes_),0:output_layer))
 
-    do concurrent(i=1:lon, j=1:lev, k=1:lat)
+    do concurrent(i=1:dims(1), j=1:dims(2), k=1:dims(3))
       input_components(i,j,k,:) = inputs(i,j,k)%values_
     end do
+    input_components_d = input_components
 
-    dim_thread = lat*lev*lon
+    dim_thread = dims(1)*dims(2)*dims(3)
     if ( dim_thread > 1024) then
       dim_thread = 1024
     end if
     
-    dim_block = ceiling(real(lat*lon*lev) / real(dim_thread))
+    dim_block = ceiling(real(dims(1)*dims(2)*dims(3)) / real(dim_thread))
 
     if (dim_block > 65535) then
       dim_block = 65535
     end if
+    print *, dim_block,dim_thread
+    call cuda_function<<<dim_block,dim_thread>>>(input_components_d,output_components_d,a, w_d,b_d,n_d,lon,lev,lat)
+    output_components = output_components_d
 
-    input_components_d = input_components
-    call cuda_function<<<dim_block,dim_thread>>>(input_components_d,output_components_d,w_d,b_d,n_d,min_in_d, max_in_d, min_out_d, max_out_d,lon,lev,lat)
-
-    output_components_d = output_components
-
-    allocate(outputs(lon,lev,lat))
-    do concurrent(i=1:lon, j=1:lev, k=1:lat)
+    allocate(outputs(dims(1),dims(2),dims(3)))
+    do concurrent(i=1:dims(1), j=1:dims(2), k=1:dims(3))
       outputs(i,j,k) = tensor_t(output_components(i,j,k,:))
     end do
+
+    deallocate(input_components(lon,lev,lat,self%num_inputs()))
+    deallocate(input_components_d(lon,lev,lat,self%num_inputs()))
+    deallocate(output_components(lon,lev,lat,self%num_outputs()))
+    deallocate(output_components_d(lon,lev,lat,self%num_outputs()))
+    deallocate(a(lon,lev,lat,maxval(self%nodes_),0:output_layer))
 
   end procedure
 
@@ -156,7 +168,6 @@ submodule(inference_engine_m_) inference_engine_s
     lon = dims(1)
     lev = dims(2)
     lat = dims(3)
-    
     allocate(input_components(dims(1),dims(2),dims(3),self%num_inputs()))
     allocate(output_components(dims(1),dims(2),dims(3),self%num_outputs()))
 
@@ -168,7 +179,7 @@ submodule(inference_engine_m_) inference_engine_s
     allocate(outputs(dims(1),dims(2),dims(3)))
 
 #ifndef __OFFLOADING
-  !$omp parallel do private(a) shared(inputs, outputs, n,w,b,output_layer)
+  !$omp parallel do private(a) shared(input_components, output_components, n,w,b,output_layer, min_in,max_in,min_out,max_out)
 #else
   !$omp target map(from:output_components) map(to:input_components,n,w,b,a,min_in,max_in,min_out,max_out)
   !$omp teams distribute parallel do firstprivate(a) &
@@ -197,10 +208,10 @@ submodule(inference_engine_m_) inference_engine_s
   !$acc end data
   !$omp end teams distribute parallel do
   !$omp end target
-    do concurrent(i=1:lon, j=1:lev, k=1:lat)
-      outputs(i,j,k) = tensor_t(output_components(i,j,k,:))
-    end do
 #endif
+  do concurrent(i=1:lon, j=1:lev, k=1:lat)
+    outputs(i,j,k) = tensor_t(output_components(i,j,k,:))
+  end do
 end procedure
 
 

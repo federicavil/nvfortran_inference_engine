@@ -24,13 +24,12 @@ program concurrent_inferences
     block 
       type(inference_engine_t) network, inference_engine
       type(tensor_t), allocatable :: inputs(:,:,:), outputs(:,:,:), outputs_elem_infer(:,:,:)
-      real, allocatable :: input_components(:,:,:,:)
+      real, allocatable :: input_components(:,:,:,:), outputs_values(:,:,:,:), outputs_elem_infer_values(:,:,:,:)
       real, parameter :: tolerance = 1.e-01
-      integer, parameter :: lat=20, lon=350, lev=450 ! latitudes, longitudes, levels (elevations)
+      !integer, parameter :: lat=20, lon=350, lev=450 ! latitudes, longitudes, levels (elevations)
+      integer, parameter :: lat=7, lon=7, lev=7 ! latitudes, longitudes, levels (elevations)
+      
       integer i, j, k, l
-      real , allocatable :: boh_1(:), boh_2(:)
-      allocate(boh_1(5))
-      allocate(boh_2(5))
       
       print *, "Constructing a new inference_engine_t object from the file " 
       inference_engine = inference_engine_t()
@@ -39,6 +38,8 @@ program concurrent_inferences
       allocate(inputs(lon,lev,lat))
       allocate(outputs(lon,lev,lat))
       allocate(input_components(lon,lev,lat,inference_engine%num_inputs()))
+      allocate(outputs_elem_infer_values(lon,lev,lat,inference_engine%num_outputs()))
+      allocate(outputs_values(lon,lev,lat,inference_engine%num_outputs()))
       call random_number(input_components)
   
       do concurrent(i=1:lon, j=1:lev, k=1:lat)
@@ -65,7 +66,7 @@ program concurrent_inferences
         end do
         call system_clock(t_finish)
         print *,"Looping inference time: ", real(t_finish - t_start, real64)/real(clock_rate, real64)
-  
+
         print *,"Performing concurrent inference"
         call system_clock(t_start)
         do concurrent(i=1:lon, j=1:lev, k=1:lat)
@@ -89,6 +90,18 @@ program concurrent_inferences
         call system_clock(t_finish)
         print *,"Cuda inference time: ", &
         real(t_finish - t_start, real64)/real(clock_rate, real64) 
+
+        ! do concurrent(i=1:lon, j=1:lev, k=1:lat)
+        !   outputs_elem_infer_values(i,j,k,:) = outputs_elem_infer(i,j,k)%values_ 
+        !   outputs_values(i,j,k,:) = outputs(i,j,k)%values_ 
+        ! end do
+
+        ! do concurrent(i=1:lon, j=1:lev, k=1:lat, l=1:inference_engine%num_outputs())
+        !   if (abs(outputs_elem_infer_values(i,j,k,l) - outputs_values(i,j,k,l)) > tolerance) then
+        !     print *, outputs_elem_infer_values(i,j,k,l), outputs_values(i,j,k,l)
+        !   end if  
+        ! end do
+ 
 
         print *,"Performing multithreading/offloading inferences"
         call system_clock(t_start, clock_rate)

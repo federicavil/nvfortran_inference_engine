@@ -4,3 +4,5 @@ license = "see LICENSE.txt"
 author = "Damian Rouson, Tan Nguyen, Jordan Welsman, David Torres, Brad Richardson, Katherine Rasmussen, Federica Villani"
 maintainer = "rouson@lbl.gov"
 
+[build]
+external-modules = ["cudafor","cublas"]
