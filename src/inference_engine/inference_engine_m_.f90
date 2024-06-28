@@ -7,7 +7,7 @@ module inference_engine_m_
   use kind_parameters_m, only : rkind
   use tensor_m, only : tensor_t
   use tensor_range_m, only : tensor_range_t
-  
+  use iso_fortran_env, only : int64, real64
   implicit none
 
   private
@@ -116,19 +116,21 @@ module inference_engine_m_
       type(tensor_t) outputs
     end function
 
-    module function parallel_infer(self, inputs) result(outputs)
+    module subroutine parallel_infer(self, inputs, outputs, t_exec)
       implicit none 
       class(inference_engine_t), intent(in) :: self
       type(tensor_t), intent(in) :: inputs(:,:,:)
-      type(tensor_t), allocatable :: outputs(:,:,:)
-    end function
+      type(tensor_t), allocatable, intent(out) :: outputs(:,:,:)
+      real(real64), intent(out) :: t_exec
+    end subroutine
 
-    module function cuda_infer(self, inputs) result(outputs)
+    module subroutine cuda_infer(self, inputs, outputs, t_exec)
       implicit none 
       class(inference_engine_t), intent(in) :: self
       type(tensor_t), intent(in) :: inputs(:,:,:)
-      type(tensor_t), allocatable :: outputs(:,:,:)
-    end function
+      type(tensor_t), allocatable, intent(out) :: outputs(:,:,:)
+      real(real64), intent(out) :: t_exec
+    end subroutine
 
     elemental module function num_outputs(self) result(output_count)
       implicit none
