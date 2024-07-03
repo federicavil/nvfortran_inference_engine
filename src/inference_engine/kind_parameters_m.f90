@@ -3,5 +3,5 @@ module kind_parameters_m
     private
     public :: rkind
   
-    integer, parameter :: rkind = kind(1.0)
+    integer, parameter :: rkind = kind(8.0)
   end module kind_parameters_m

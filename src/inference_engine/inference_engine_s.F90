@@ -123,7 +123,6 @@ submodule(inference_engine_m_) inference_engine_s
     allocate(input_components_d(dims(1),dims(2),dims(3),self%num_inputs()))
     allocate(output_components(dims(1),dims(2),dims(3),self%num_outputs()))
     allocate(output_components_d(dims(1),dims(2),dims(3),self%num_outputs()))
-    allocate(a_d(dims(1),dims(2),dims(3),maxval(self%nodes_), 0:output_layer))
 
     do concurrent(i=1:dims(1), j=1:dims(2), k=1:dims(3))
       input_components(i,j,k,:) = inputs(i,j,k)%values_
@@ -156,7 +155,6 @@ submodule(inference_engine_m_) inference_engine_s
     deallocate(input_components_d(dims(1),dims(2),dims(3),self%num_inputs()))
     deallocate(output_components(dims(1),dims(2),dims(3),self%num_outputs()))
     deallocate(output_components_d(lon,lev,lat,self%num_outputs()))
-    deallocate(a_d(dims(1),dims(2),dims(3),maxval(self%nodes_), 0:output_layer))
    
 
   end procedure
@@ -196,14 +194,15 @@ submodule(inference_engine_m_) inference_engine_s
     allocate(outputs(dims(1),dims(2),dims(3)))
 
 #ifndef __OFFLOADING
+call system_clock(t_start, clock_rate)
   !$omp parallel do private(a) shared(input_components, output_components, n,w,b,output_layer, min_in,max_in,min_out,max_out)
 #else
-  !$omp target enter data map(to:input_components,n,w,b,min_in,max_in,min_out,max_out) map(alloc:a)
-  !$acc data copyout(output_components) create(a) &
+  !$omp target enter data map(to:input_components,n,w,b,min_in,max_in,min_out,max_out)
+  !$acc data copyout(output_components) &
   !$acc present_or_copyin(input_components,n,w,b,min_in, max_in, min_out, max_out) 
 
   call system_clock(t_start, clock_rate)
-  !$acc parallel loop collapse(3)
+  !$acc parallel loop collapse(3) private(a)
   !$omp target teams distribute parallel do firstprivate(a) collapse(3)
 
 #endif
@@ -223,11 +222,12 @@ submodule(inference_engine_m_) inference_engine_s
     end do  
 #ifndef __OFFLOADING    
   !$omp end parallel do
+call system_clock(t_start, clock_rate)
 #else
   !$omp end target teams distribute parallel do
   call system_clock(t_finish)
   !$acc end data
-  !$omp target exit data map(from:output_components)
+  !$omp target exit data map(from:output_components) map(release:input_components,n,w,b,min_in,max_in,min_out,max_out)
 
 #endif
   do concurrent(i=1:lon, j=1:lev, k=1:lat)

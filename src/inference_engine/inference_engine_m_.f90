@@ -23,7 +23,7 @@ module inference_engine_m_
 
   type inference_engine_t
     !! Encapsulate the minimal information needed to perform inference
-    private
+    !private
     type(tensor_range_t) input_range_, output_range_
     type(string_t) metadata_(size(key))
     real(rkind), allocatable :: weights_(:,:,:), biases_(:,:)
