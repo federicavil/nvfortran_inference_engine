@@ -16,7 +16,6 @@ submodule(inference_engine_m_) inference_engine_s
 
       allocate(a(maxval(n), input_layer:output_layer))
       a(1:n(input_layer),input_layer) = (inputs%values_ - self%input_range_%minima_)/(self%input_range_%maxima_- self%input_range_%minima_)
-      !a(1:n(input_layer),input_layer) = inputs%values()
       feed_forward: &
       do l = input_layer+1, output_layer
         associate(z => matmul(w(1:n(l),1:n(l-1),l), a(1:n(l-1),l-1)) + b(1:n(l),l))
@@ -24,7 +23,6 @@ submodule(inference_engine_m_) inference_engine_s
         end associate
       end do feed_forward
       outputs = tensor_t(self%output_range_%minima_ + a(1:n(output_layer), output_layer)*(self%output_range_%maxima_ - self%output_range_%minima_ ))
-      !outputs = tensor_t(a(1:n(output_layer), output_layer))
 
     end associate
 
@@ -81,9 +79,7 @@ submodule(inference_engine_m_) inference_engine_s
             end do
             a(row,l) = 1./(1.+exp(-(part_res + b(row,l-1))))
           end do
-    ! !       !a(1:n(l),l) = 1./(1.+exp(-(matmul(w(1:n(l),1:n(l-1),l), a(1:n(l-1),l-1)) + b(1:n(l),l))))
         end do feed_forward
-        !output_components(x+1,y+1,z+1,:) = a(1:n(output_layer), output_layer)
         
         output_components(x+1,y+1,z+1,:) = min_out(:) + a(1:n(output_layer), output_layer)*(max_out(:) - min_out(:))
       end if
@@ -92,8 +88,8 @@ submodule(inference_engine_m_) inference_engine_s
   end subroutine
 
   module procedure cuda_infer
-    integer, parameter :: input_layer = 0 !questo mi sa che serve al device
-    integer i,j,k, l, dims(3) !Dovrebbe stare solo qui
+    integer, parameter :: input_layer = 0
+    integer i,j,k, l, dims(3)
     integer :: dim_thread, dim_block
     !real(rkind), allocatable :: w(:,:,:), b(:,:)
     !integer, allocatable :: n(:)
@@ -197,11 +193,12 @@ submodule(inference_engine_m_) inference_engine_s
 call system_clock(t_start, clock_rate)
   !$omp parallel do private(a) shared(input_components, output_components, n,w,b,output_layer, min_in,max_in,min_out,max_out)
 #else
+  
   !$omp target enter data map(to:input_components,n,w,b,min_in,max_in,min_out,max_out)
   !$acc data copyout(output_components) &
   !$acc present_or_copyin(input_components,n,w,b,min_in, max_in, min_out, max_out) 
-
   call system_clock(t_start, clock_rate)
+  
   !$acc parallel loop collapse(3) private(a)
   !$omp target teams distribute parallel do firstprivate(a) collapse(3)
 
@@ -222,18 +219,18 @@ call system_clock(t_start, clock_rate)
     end do  
 #ifndef __OFFLOADING    
   !$omp end parallel do
-call system_clock(t_start, clock_rate)
 #else
   !$omp end target teams distribute parallel do
+  
   call system_clock(t_finish)
   !$acc end data
-  !$omp target exit data map(from:output_components) map(release:input_components,n,w,b,min_in,max_in,min_out,max_out)
-
+  !$omp target exit data map(from:output_components) 
+  !map(release:input_components,n,w,b,min_in,max_in,min_out,max_out)
 #endif
   do concurrent(i=1:lon, j=1:lev, k=1:lat)
     outputs(i,j,k) = tensor_t(output_components(i,j,k,:))
   end do
-  t_exec = real(t_finish - t_start, real64)/real(clock_rate, real64)
+  t_exec =real(t_finish - t_start, real64)/real(clock_rate, real64)
 end procedure
 
 
