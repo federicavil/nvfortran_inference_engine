@@ -1,3 +1,5 @@
+! Copyright (c), The Regents of the University of California
+! Terms of use are as specified in LICENSE.txt
 submodule(tensor_range_m) tensor_range_s
   !use sourcery_formats_m, only : separated_values
   use kind_parameters_m, only : rkind

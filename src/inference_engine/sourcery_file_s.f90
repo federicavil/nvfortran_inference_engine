@@ -1,3 +1,5 @@
+! Copyright (c), The Regents of the University of California
+! Terms of use are as specified in LICENSE.txt
 submodule(sourcery_file_m) sourcery_file_s
   use iso_fortran_env, only : iostat_end, iostat_eor, output_unit
   implicit none

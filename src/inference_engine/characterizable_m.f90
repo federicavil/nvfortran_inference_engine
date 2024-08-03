@@ -1,3 +1,5 @@
+! Copyright (c), The Regents of the University of California
+! Terms of use are as specified in LICENSE.txt
 module characterizable_m
     !! Define an abstract class that supports object representation in character form
     implicit none

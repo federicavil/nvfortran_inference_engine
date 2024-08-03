@@ -1,3 +1,5 @@
+! Copyright (c), The Regents of the University of California
+! Terms of use are as specified in LICENSE.txt
 program concurrent_inferences
     !! This program demonstrates how to read a neural network from a JSON file
     !! and use the network to perform concurrent inferences.

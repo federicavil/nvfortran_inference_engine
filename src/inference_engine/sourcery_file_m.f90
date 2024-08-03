@@ -1,3 +1,5 @@
+! Copyright (c), The Regents of the University of California
+! Terms of use are as specified in LICENSE.txt
 module sourcery_file_m
     !! A representation of a file as an object
     use sourcery_string_m, only : string_t
